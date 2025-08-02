@@ -3,6 +3,7 @@ import os
 import re
 import random
 
+import redis
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -56,18 +57,29 @@ def help_command(update: Update, context: CallbackContext) -> None:
 def echo(update: Update, context: CallbackContext) -> None:
     message = update.message.text
     questions = context.bot_data.get("questions", {})
+    db = context.bot_data.get('db')
     if message == 'Новый вопрос':
         question_number = random.randint(1, len(questions))
-        update.message.reply_text(
-            questions[f'question{question_number}']['question'])
+        question = questions[f'question{question_number}']
+        db.set(update.effective_user.id, question['answer'])
+        update.message.reply_text(question['question'])
     elif message == 'Сдаться':
         pass
     elif message == 'Мой счёт':
         pass
+    else:
+        answer = db.get(update.effective_user.id).decode('utf-8')
+        if message.lower() == re.sub(r'\s*\([^)]*\)|[.]+$', '', answer).lower():
+            update.message.reply_text('Правильно! Поздравляю! Для ' \
+                                      'следующего вопроса нажми «Новый вопрос')
+        else:
+            update.message.reply_text('Неправильно… Попробуешь ещё раз?')
 
 
 def main() -> None:
     questions = get_questions('quiz-questions')
+
+    db = redis.Redis(host='localhost', port=6379, db=0)
 
     load_dotenv()
     token = os.getenv('TG_BOT_TOKEN')
@@ -76,6 +88,7 @@ def main() -> None:
     dispatcher = updater.dispatcher
 
     dispatcher.bot_data['questions'] = questions
+    dispatcher.bot_data['db'] = db
 
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
