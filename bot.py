@@ -81,6 +81,15 @@ def handle_solution_attempt(update, context):
         return State.SOLUTION_ATTEMPT.value
 
 
+def handle_surrender(update, context):
+    db = context.bot_data.get('db')
+    answer = db.get(update.effective_user.id).decode('utf-8')
+    update.message.reply_text(f'Вот правильный ответ: {answer}\n' \
+                              'Нажми "Новый вопрос" для продолжения')
+
+    return State.NEW_QUESTION.value
+
+
 def main() -> None:
     questions = get_questions('quiz-questions')
 
@@ -103,6 +112,7 @@ def main() -> None:
             ],
             State.SOLUTION_ATTEMPT.value: [
                 MessageHandler(Filters.regex('Новый вопрос'), handle_new_question_request),
+                MessageHandler(Filters.regex('Сдаться'), handle_surrender),
                 MessageHandler(Filters.text & ~Filters.command, handle_solution_attempt)
             ],
         },
