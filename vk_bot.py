@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import logging
 
 import redis
 import vk_api as vk
@@ -9,25 +10,10 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 from dotenv import load_dotenv
 
+from utils import get_questions
 
-def get_questions(path):
-    pattern = re.compile(
-        r"Вопрос(?::|\s+\d+:)\s*(?P<question>.+?)\s*Ответ:\s*(?P<answer>.+?)(?=\n(?:Комментарий:|Источник:|Автор:|Вопрос:|$))",
-        re.DOTALL
-    )
-    questions = {}
-    count = 1
-    for dirpath, _, filenames in os.walk(path):
-        for file in filenames:
-            with open(os.path.join(dirpath, file), encoding='KOI8-R') as f:
-                matches = pattern.finditer(f.read())
-                for match in matches:
-                    questions[f'question{count}'] = {
-                        'question': match.group('question'),
-                        'answer': match.group('answer')
-                    }
-                    count += 1
-    return questions
+
+logger = logging.getLogger(__name__)
 
 
 def handle_message_from_user(event, vk_api, keyboard, questions, db):
@@ -69,7 +55,12 @@ def handle_message_from_user(event, vk_api, keyboard, questions, db):
 
 
 def main():
-    questions = get_questions('quiz-questions')
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+
+    questions = get_questions('quiz-questions', logger)
 
     db = redis.Redis(host='localhost', port=6379, db=0)
 
@@ -84,6 +75,7 @@ def main():
     keyboard.add_line()
     keyboard.add_button('Сдаться')
 
+    logger.info('bot started')
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
             handle_message_from_user(event, vk_api, keyboard, questions, db)

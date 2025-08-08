@@ -10,10 +10,8 @@ from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           CallbackContext, ConversationHandler)
 
+from utils import get_questions
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
 
 logger = logging.getLogger(__name__)
 
@@ -21,27 +19,6 @@ logger = logging.getLogger(__name__)
 class State(Enum):
     NEW_QUESTION = 1
     SOLUTION_ATTEMPT = 2
-
-
-def get_questions(path):
-    pattern = re.compile(
-        r"Вопрос(?::|\s+\d+:)\s*(?P<question>.+?)\s*Ответ:\s*(?P<answer>.+?)(?=\n(?:Комментарий:|Источник:|Автор:|Вопрос:|$))",
-        re.DOTALL
-    )
-    questions = {}
-    count = 1
-    for dirpath, _, filenames in os.walk(path):
-        for file in filenames:
-            with open(os.path.join(dirpath, file), encoding='KOI8-R') as f:
-                matches = pattern.finditer(f.read())
-                for match in matches:
-                    questions[f'question{count}'] = {
-                        'question': match.group('question'),
-                        'answer': match.group('answer')
-                    }
-                    count += 1
-    logger.info('messages fetched')
-    return questions
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -91,7 +68,11 @@ def handle_surrender(update, context):
 
 
 def main() -> None:
-    questions = get_questions('quiz-questions')
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+    questions = get_questions('quiz-questions', logger)
 
     db = redis.Redis(host='localhost', port=6379, db=0)
 
@@ -108,12 +89,15 @@ def main() -> None:
         entry_points=[CommandHandler("start", start)],
         states={
             State.NEW_QUESTION.value: [
-                MessageHandler(Filters.regex('Новый вопрос'), handle_new_question_request),
+                MessageHandler(Filters.regex('Новый вопрос'),
+                               handle_new_question_request),
             ],
             State.SOLUTION_ATTEMPT.value: [
-                MessageHandler(Filters.regex('Новый вопрос'), handle_new_question_request),
+                MessageHandler(Filters.regex('Новый вопрос'),
+                               handle_new_question_request),
                 MessageHandler(Filters.regex('Сдаться'), handle_surrender),
-                MessageHandler(Filters.text & ~Filters.command, handle_solution_attempt)
+                MessageHandler(Filters.text & ~Filters.command,
+                               handle_solution_attempt)
             ],
         },
         fallbacks=[CommandHandler("start", start)],
