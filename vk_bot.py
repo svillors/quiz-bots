@@ -65,7 +65,7 @@ def main():
     db = redis.Redis(host='localhost', port=6379, db=0)
 
     load_dotenv()
-    token = os.getenv('VK_TOKEN')
+    token = os.environ['VK_TOKEN']
     vk_session = vk.VkApi(token=token)
     vk_api = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)

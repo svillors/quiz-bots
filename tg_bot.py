@@ -77,7 +77,7 @@ def main() -> None:
     db = redis.Redis(host='localhost', port=6379, db=0)
 
     load_dotenv()
-    token = os.getenv('TG_BOT_TOKEN')
+    token = os.environ['TG_BOT_TOKEN']
     updater = Updater(token)
 
     dispatcher = updater.dispatcher
